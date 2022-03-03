@@ -1,0 +1,89 @@
+---
+title: "STAA 566 Maps"
+author: "Sherry Schulz"
+date: "2/21/2022"
+output: html_document
+knit: (function(input_file, encoding){out_dir<-'docs';rmarkdown::render(input_file,encoding=encoding,output_file=file.path(dirname(input_file),out_dir, 'index.html'))})
+---
+```{r setup, include=FALSE}
+#Retain this code chunk!!!
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+
+```{r}
+library("leaflet")
+library("tidyverse")
+library("dplyr")
+library("leafpop")
+library("tidyr")
+library("leaflet.minicharts")
+```
+
+I wanted to investigate how life expectancy has changed over the past 20 years.
+The life expectancy data set was retrieved from https://www.kaggle.com/deepcontractor/human-life-expectancy-around-the-world
+The world coordinate data set was retrieved from https://www.kaggle.com/paultimothymooney/latitude-and-longitude-for-every-country-and-state
+
+I combined the two data sets so I can create maps that has popup figure and popup chart.
+```{r}
+life<-read.csv("Human_life_Expectancy.csv")
+location<-read.csv("World_Locator.csv")
+location<-location[,2:4] #Keeping columns 2, 3, and 4 of the location file and replace the file.
+```
+
+
+```{r}
+life<-life[life$Level=="National",]
+combined<-left_join(life, location, by = "Country") #For each row of national it is trying to match the location in the location file. Now it combines the 2 files.
+
+```
+
+```{r}
+combined<-replace(combined, combined == "Not Available", NA) #replace Not Available to NA
+for (i in 5:ncol(combined)){
+  combined[,i] <- as.numeric(combined[,i])
+} #loop from i=5 onward in combined, take the ith row in combined and replace it with numeric category.
+```
+
+```{r}
+countrydat<-combined[1:186,] #where i is the row with the country you want to plot
+countrydat<-pivot_longer(data=countrydat, cols=X1999:X2019) #makes a row for each year
+date<-as.numeric(substr(countrydat$name,2,5)) #change years to character
+```
+
+This graph shows the life expectancy for each country in 2019.
+
+```{r}
+combined %>%
+  leaflet() %>%
+  setView(lng=0, lat=0, zoom = 4) %>%
+  addTiles() %>%
+  addMarkers(lat=~latitude, lng=~longitude,
+             icon=list(
+               iconUrl="https://img.icons8.com/material/24/000000/arms-up.png",
+               iconSize=c(20,20)
+             ),popup=~as.character(X2019))
+
+
+```
+
+This graph compare the the progression of the life expectancy of 1990, 2000, and 2019 of each country. Generally speaking, we see that the life expectancy today is longer than 20 years ago!
+```{r}
+tilesURL <- "http://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+basemap<-leaflet(width="100%", height = "400px")%>% addTiles(tilesURL)
+combined1<-combined %>% select(X1990,X2000, X2019)
+colors <- c("#3093e5", "#fcba50", "#a0d9e8")
+basemap %>% leaflet() %>% 
+  setView(lng = 0, lat=0, zoom = 4)%>%
+  addTiles() %>%
+  addMinicharts(combined$latitude, combined$longitude,
+                chartdata = combined1, colorPalette = colors, width=30, height=30,legendPosition = "topright", showLabels = TRUE)
+
+```
+
+
+# Appendix
+```{r show-code, ref.label = all_labels(), echo = TRUE, eval = FALSE}
+```
+
